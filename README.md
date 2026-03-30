@@ -86,7 +86,7 @@ This project is based on the Forge MDK for 1.20.1-47.4.10. If starting from scra
 ./gradlew build
 ```
 
-This will compile the mod and generate the JAR file.
+This will compile the mod and generate the JAR file at `build/libs/victorymod-1.0.0.jar`. Copy this JAR to your Prism Launcher instance's mods folder to install the mod.
 
 ## Running the Mod
 

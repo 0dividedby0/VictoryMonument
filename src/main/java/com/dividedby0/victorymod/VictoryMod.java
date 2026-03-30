@@ -2,15 +2,24 @@ package com.dividedby0.victorymod;
 
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.client.ConfigScreenHandler;
+import com.dividedby0.victorymod.config.ConfigManager;
 
 @Mod(VictoryMod.MODID)
 public class VictoryMod {
     public static final String MODID = "victorymod";
 
     public VictoryMod() {
-        // Register the config spec - this makes the Config button available in the mods menu
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ModConfigHandler.CONFIG_SPEC);
+        // Initialize JSON5 config manager
+        ConfigManager.getInstance();
+        
+        // Register config screen factory for the mods menu config button
+        ModLoadingContext.get().registerExtensionPoint(
+            ConfigScreenHandler.ConfigScreenFactory.class,
+            () -> new ConfigScreenHandler.ConfigScreenFactory(
+                (minecraft, screen) -> new SimpleConfigScreen(screen, ConfigManager.getInstance())
+            )
+        );
         
         WorldInit.init();
         MonumentTracker.init();

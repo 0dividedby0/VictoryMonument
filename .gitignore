@@ -27,7 +27,7 @@ saves/
 options.txt
 usercache.json
 usernamecache.json
-config/
+run/config/
 defaultconfigs/
 
 # OS

@@ -7,6 +7,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import com.dividedby0.victorymod.config.ConfigManager;
+import com.dividedby0.victorymod.config.JSON5ConfigManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,50 +34,121 @@ public class StructureSpawner {
 
         BlockPos victoryPos = new BlockPos(spawnX, spawnY, spawnZ);
         
-        // Check if victory monument location is valid (on land)
-        if (isValidSpawnLocation(level, victoryPos)) {
-            placeStructure(level, "victory_monument", victoryPos);
-            placedStructures.add(victoryPos);
-        } else {
-            System.err.println("[VictoryMod] Victory monument spawn location not valid (not on land): " + victoryPos);
+        // Try to find a valid location for the victory monument
+        BlockPos validMonumentPos = victoryPos;
+        if (!isValidSpawnLocation(level, victoryPos)) {
+            // If exact spawn is invalid, search nearby for a valid location
+            validMonumentPos = findNearbyValidLocation(level, spawnX, spawnZ, 100);
+            if (validMonumentPos == null) {
+                System.err.println("[VictoryMod] Could not find valid spawn location for victory monument!");
+                // Force place at spawn anyway as fallback
+                validMonumentPos = victoryPos;
+            }
         }
+        
+        placeStructure(level, "victory_monument", validMonumentPos);
+        placedStructures.add(validMonumentPos);
 
         Random rand = new Random();
-        // Configurable spawn radius and buffer - read from config with fallback defaults
-        int minRadius = getConfigIntValue(ModConfigHandler.COMMON.minDungeonRadius, 40);
-        int maxRadius = getConfigIntValue(ModConfigHandler.COMMON.maxDungeonRadius, 750);
-        int bufferDistance = getConfigIntValue(ModConfigHandler.COMMON.structureBufferDistance, 30);
+        // Read configuration from JSON5 config
+        JSON5ConfigManager configManager = ConfigManager.getInstance();
+        int minRadius = configManager.getInt("minDungeonRadius", 40);
+        int maxRadius = configManager.getInt("maxDungeonRadius", 750);
+        int bufferDistance = configManager.getInt("structureBufferDistance", 30);
         
         for (String color : COLORS) {
-            // Attempt to find a valid spawn location for this dungeon
-            int attempts = 0;
-            int maxAttempts = 50;
-            BlockPos validPos = null;
-            
-            while (validPos == null && attempts < maxAttempts) {
-                double angle = rand.nextDouble() * Math.PI * 2.0;
-                int radius = minRadius + rand.nextInt(maxRadius - minRadius + 1);
-                int x = spawnX + (int) Math.round(radius * Math.cos(angle));
-                int z = spawnZ + (int) Math.round(radius * Math.sin(angle));
-
-                int y = getGroundY(level, x, z);
-                BlockPos candidatePos = new BlockPos(x, y, z);
-                
-                // Check if location is on land and doesn't overlap with existing structures
-                if (isValidSpawnLocation(level, candidatePos) && !overlapsWithExisting(candidatePos, bufferDistance)) {
-                    validPos = candidatePos;
-                }
-                
-                attempts++;
-            }
-            
-            if (validPos != null) {
-                placeStructure(level, "dungeon_" + color, validPos);
-                placedStructures.add(validPos);
-            } else {
-                System.err.println("[VictoryMod] Could not find valid spawn location for dungeon_" + color + " after " + maxAttempts + " attempts");
+            BlockPos dungeonPos = spawnDungeonWithFallbacks(level, rand, spawnX, spawnZ, color, minRadius, maxRadius, bufferDistance);
+            if (dungeonPos != null) {
+                placedStructures.add(dungeonPos);
             }
         }
+    }
+
+    /**
+     * Spawn a dungeon with progressive fallback strategies to ensure placement.
+     * Tries in order: valid location + proximity check, valid location only, 
+     * any location + proximity check, any location.
+     */
+    private static BlockPos spawnDungeonWithFallbacks(ServerLevel level, Random rand, int spawnX, int spawnZ, 
+                                                       String color, int minRadius, int maxRadius, int bufferDistance) {
+        // Strategy 1: Valid location + respect buffer distance
+        BlockPos pos = findDungeonLocation(level, rand, spawnX, spawnZ, minRadius, maxRadius, bufferDistance, true, true);
+        if (pos != null) {
+            placeStructure(level, "dungeon_" + color, pos);
+            return pos;
+        }
+        
+        // Strategy 2: Valid location only (ignore buffer)
+        System.out.println("[VictoryMod] Dungeon_" + color + " relaxing buffer constraint");
+        pos = findDungeonLocation(level, rand, spawnX, spawnZ, minRadius, maxRadius, 0, true, true);
+        if (pos != null) {
+            placeStructure(level, "dungeon_" + color, pos);
+            return pos;
+        }
+        
+        // Strategy 3: Any location + respect buffer (ignore valid location check)
+        System.out.println("[VictoryMod] Dungeon_" + color + " relaxing valid location constraint");
+        pos = findDungeonLocation(level, rand, spawnX, spawnZ, minRadius, maxRadius, bufferDistance, false, true);
+        if (pos != null) {
+            placeStructure(level, "dungeon_" + color, pos);
+            return pos;
+        }
+        
+        // Strategy 4: Any location, any radius (ignore valid location and buffer)
+        System.out.println("[VictoryMod] Dungeon_" + color + " relaxing radius and proximity constraints");
+        pos = findDungeonLocation(level, rand, spawnX, spawnZ, minRadius, maxRadius, 0, false, false);
+        if (pos != null) {
+            placeStructure(level, "dungeon_" + color, pos);
+            return pos;
+        }
+        
+        // Strategy 5: Force placement at a random location near spawn
+        System.out.println("[VictoryMod] Dungeon_" + color + " forcing placement near spawn");
+        int forceX = spawnX + rand.nextInt(400) - 200;
+        int forceZ = spawnZ + rand.nextInt(400) - 200;
+        int forceY = getGroundY(level, forceX, forceZ);
+        BlockPos forcePos = new BlockPos(forceX, forceY, forceZ);
+        placeStructure(level, "dungeon_" + color, forcePos);
+        return forcePos;
+    }
+
+    /**
+     * Find a dungeon location with configurable constraints.
+     */
+    private static BlockPos findDungeonLocation(ServerLevel level, Random rand, int spawnX, int spawnZ, 
+                                               int minRadius, int maxRadius, int bufferDistance, 
+                                               boolean requireValidLocation, boolean enforceRadius) {
+        int attempts = 0;
+        int maxAttempts = 100;
+        
+        while (attempts < maxAttempts) {
+            int x, z;
+            
+            if (enforceRadius) {
+                double angle = rand.nextDouble() * Math.PI * 2.0;
+                int radius = minRadius + rand.nextInt(maxRadius - minRadius + 1);
+                x = spawnX + (int) Math.round(radius * Math.cos(angle));
+                z = spawnZ + (int) Math.round(radius * Math.sin(angle));
+            } else {
+                // Any location within a larger search area
+                x = spawnX + rand.nextInt(maxRadius * 2) - maxRadius;
+                z = spawnZ + rand.nextInt(maxRadius * 2) - maxRadius;
+            }
+            
+            int y = getGroundY(level, x, z);
+            BlockPos candidatePos = new BlockPos(x, y, z);
+            
+            boolean locationValid = !requireValidLocation || isValidSpawnLocation(level, candidatePos);
+            boolean bufferOk = bufferDistance == 0 || !overlapsWithExisting(candidatePos, bufferDistance);
+            
+            if (locationValid && bufferOk) {
+                return candidatePos;
+            }
+            
+            attempts++;
+        }
+        
+        return null;
     }
 
     private static int getGroundY(ServerLevel level, int x, int z) {
@@ -95,6 +168,31 @@ public class StructureSpawner {
         y = Math.max(y, level.getMinBuildHeight() + 1);
         y = Math.min(y, level.getMaxBuildHeight() - 1);
         return y;
+    }
+
+    /**
+     * Finds a nearby valid spawn location within a search radius.
+     * Searches in expanding circles around the center point.
+     */
+    private static BlockPos findNearbyValidLocation(ServerLevel level, int centerX, int centerZ, int searchRadius) {
+        Random rand = new Random();
+        
+        // Try random locations in expanding circles
+        for (int radius = 10; radius <= searchRadius; radius += 10) {
+            for (int attempt = 0; attempt < 20; attempt++) {
+                double angle = rand.nextDouble() * Math.PI * 2.0;
+                int x = centerX + (int) Math.round(radius * Math.cos(angle));
+                int z = centerZ + (int) Math.round(radius * Math.sin(angle));
+                int y = getGroundY(level, x, z);
+                
+                BlockPos candidatePos = new BlockPos(x, y, z);
+                if (isValidSpawnLocation(level, candidatePos)) {
+                    return candidatePos;
+                }
+            }
+        }
+        
+        return null;
     }
 
     /**
@@ -174,18 +272,6 @@ public class StructureSpawner {
             System.err.println("[VictoryMod] failed to place structure " + name + " at " + pos);
         } else {
             System.out.println("[VictoryMod] placed " + name + " at " + pos);
-        }
-    }
-
-    /**
-     * Safely get a config integer value, falling back to default if config not yet loaded
-     */
-    private static int getConfigIntValue(net.minecraftforge.common.ForgeConfigSpec.IntValue configValue, int defaultValue) {
-        try {
-            return configValue.get();
-        } catch (Exception e) {
-            // Config not loaded yet, use default
-            return defaultValue;
         }
     }
 }
