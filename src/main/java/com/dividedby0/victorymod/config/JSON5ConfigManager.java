@@ -47,25 +47,6 @@ public class JSON5ConfigManager {
      * Initializes metadata for configuration entries (used by UI)
      */
     private void initializeMetadata() {
-                // Heart scaling thresholds (XP level -> hearts)
-                configMetadata.put("xpThreshold_1", new ConfigEntry(
-                    "xpThreshold_1", 10, "int", "XP level required for 2 hearts"));
-                configMetadata.put("xpThreshold_2", new ConfigEntry(
-                    "xpThreshold_2", 20, "int", "XP level required for 3 hearts"));
-                configMetadata.put("xpThreshold_3", new ConfigEntry(
-                    "xpThreshold_3", 30, "int", "XP level required for 4 hearts"));
-                configMetadata.put("xpThreshold_4", new ConfigEntry(
-                    "xpThreshold_4", 40, "int", "XP level required for 5 hearts"));
-                configMetadata.put("xpThreshold_5", new ConfigEntry(
-                    "xpThreshold_5", 50, "int", "XP level required for 6 hearts"));
-                configMetadata.put("xpThreshold_6", new ConfigEntry(
-                    "xpThreshold_6", 75, "int", "XP level required for 8 hearts"));
-                configMetadata.put("xpThreshold_7", new ConfigEntry(
-                    "xpThreshold_7", 100, "int", "XP level required for 10 hearts"));
-                configMetadata.put("xpThreshold_8", new ConfigEntry(
-                    "xpThreshold_8", 150, "int", "XP level required for 12 hearts"));
-                configMetadata.put("xpThreshold_9", new ConfigEntry(
-                    "xpThreshold_9", 200, "int", "XP level required for 15 hearts"));
         configMetadata.put("minDungeonRadius", new ConfigEntry(
             "minDungeonRadius", 40, "int", 
             "Minimum radius for dungeon placement around spawn point (in blocks)"

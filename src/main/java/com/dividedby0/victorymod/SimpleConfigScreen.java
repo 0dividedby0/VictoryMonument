@@ -1,23 +1,21 @@
 package com.dividedby0.victorymod;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import com.dividedby0.victorymod.config.JSON5ConfigManager;
 
-/**
- * Simple config screen for Victory Mod settings.
- * Displays input fields for each configuration parameter.
- */
+import java.util.function.IntConsumer;
+
 public class SimpleConfigScreen extends Screen {
     private final Screen previousScreen;
     private final JSON5ConfigManager configManager;
-    private EditBox minRadiusInput;
-    private EditBox maxRadiusInput;
-    private EditBox bufferDistanceInput;
-    private EditBox xpCsvInput;
+    private int minRadius;
+    private int maxRadius;
+    private int bufferDistance;
     
     public SimpleConfigScreen(Screen previousScreen, JSON5ConfigManager configManager) {
         super(Component.literal("Victory Mod Configuration"));
@@ -27,39 +25,21 @@ public class SimpleConfigScreen extends Screen {
     
     @Override
     protected void init() {
+        this.clearWidgets();
+
+        minRadius = configManager.getInt("minDungeonRadius", 40);
+        maxRadius = configManager.getInt("maxDungeonRadius", 750);
+        bufferDistance = configManager.getInt("structureBufferDistance", 30);
+
         int centerX = this.width / 2;
-        int labelX = centerX - 190;
-        int inputX = centerX + 10;
-        int y = 60;
+        int y = 52;
 
-        // Main config fields side by side
-        this.minRadiusInput = new EditBox(this.font, inputX, y, 120, 20, Component.literal("Min Radius"));
-        this.minRadiusInput.setValue(String.valueOf(configManager.getInt("minDungeonRadius", 40)));
-        this.addRenderableWidget(this.minRadiusInput);
-        y += 32;
+        addIntSlider(centerX - 75, y, "Min Dungeon Radius", 10, 500, minRadius, value -> minRadius = value);
+        y += 24;
+        addIntSlider(centerX - 75, y, "Max Dungeon Radius", 50, 1000, maxRadius, value -> maxRadius = value);
+        y += 24;
+        addIntSlider(centerX - 75, y, "Structure Buffer", 5, 200, bufferDistance, value -> bufferDistance = value);
 
-        this.maxRadiusInput = new EditBox(this.font, inputX, y, 120, 20, Component.literal("Max Radius"));
-        this.maxRadiusInput.setValue(String.valueOf(configManager.getInt("maxDungeonRadius", 750)));
-        this.addRenderableWidget(this.maxRadiusInput);
-        y += 32;
-
-        this.bufferDistanceInput = new EditBox(this.font, inputX, y, 120, 20, Component.literal("Buffer Distance"));
-        this.bufferDistanceInput.setValue(String.valueOf(configManager.getInt("structureBufferDistance", 30)));
-        this.addRenderableWidget(this.bufferDistanceInput);
-        y += 40;
-
-        // XP heart requirements as a single CSV field
-        int xpInputY = y + 28;
-        StringBuilder csv = new StringBuilder();
-        for (int i = 1; i <= 9; i++) {
-            if (i > 1) csv.append(",");
-            csv.append(configManager.getInt("xpThreshold_" + i, 10 * i));
-        }
-        this.xpCsvInput = new EditBox(this.font, inputX, xpInputY, 300, 20, Component.literal("XP Heart Thresholds (CSV)"));
-        this.xpCsvInput.setValue(csv.toString());
-        this.addRenderableWidget(this.xpCsvInput);
-
-        // Save and Back buttons always at bottom
         int buttonY = this.height - 40;
         this.addRenderableWidget(Button.builder(Component.literal("Save"), (btn) -> this.save())
             .bounds(centerX - 110, buttonY, 100, 20).build());
@@ -71,45 +51,55 @@ public class SimpleConfigScreen extends Screen {
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFF);
-        int labelX = this.width / 2 - 190;
-        int inputX = this.width / 2 + 10;
-        int y = 60;
-        guiGraphics.drawString(this.font, "Min Dungeon Radius (10-500):", labelX, y, 0xAAAAAA);
-        y += 32;
-        guiGraphics.drawString(this.font, "Max Dungeon Radius (50-1000):", labelX, y, 0xAAAAAA);
-        y += 32;
-        guiGraphics.drawString(this.font, "Structure Buffer (5-200):", labelX, y, 0xAAAAAA);
-        y += 40;
-        guiGraphics.drawString(this.font, "XP Heart Requirements (CSV, 9 values):", labelX, y, 0xFFCC66);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
     
     private void save() {
-        try {
-            int minRadius = Integer.parseInt(this.minRadiusInput.getValue());
-            int maxRadius = Integer.parseInt(this.maxRadiusInput.getValue());
-            int bufferDist = Integer.parseInt(this.bufferDistanceInput.getValue());
-            minRadius = Math.max(10, Math.min(500, minRadius));
-            maxRadius = Math.max(50, Math.min(1000, maxRadius));
-            bufferDist = Math.max(5, Math.min(200, bufferDist));
-            configManager.setInt("minDungeonRadius", minRadius);
-            configManager.setInt("maxDungeonRadius", maxRadius);
-            configManager.setInt("structureBufferDistance", bufferDist);
-            // Parse CSV for XP thresholds
-            String[] xpVals = this.xpCsvInput.getValue().split(",");
-            for (int i = 1; i <= 9; i++) {
-                int value = 10 * i;
-                if (xpVals.length >= i) {
-                    try {
-                        value = Integer.parseInt(xpVals[i-1].trim());
-                    } catch (NumberFormatException ignore) {}
-                }
-                configManager.setInt("xpThreshold_" + i, value);
+        configManager.setInt("minDungeonRadius", Mth.clamp(minRadius, 10, 500));
+        configManager.setInt("maxDungeonRadius", Mth.clamp(maxRadius, 50, 1000));
+        configManager.setInt("structureBufferDistance", Mth.clamp(bufferDistance, 5, 200));
+        configManager.saveConfig();
+        this.onClose();
+    }
+
+    private IntSlider addIntSlider(int x, int y, String title, int min, int max, int value, IntConsumer onChange) {
+        return this.addRenderableWidget(new IntSlider(x, y, 150, 20, title, min, max, value, onChange));
+    }
+
+    private static class IntSlider extends AbstractSliderButton {
+        private final String title;
+        private final int min;
+        private final int max;
+        private final IntConsumer onChange;
+
+        IntSlider(int x, int y, int width, int height, String title, int min, int max, int value, IntConsumer onChange) {
+            super(x, y, width, height, Component.empty(), toSlider(value, min, max));
+            this.title = title;
+            this.min = min;
+            this.max = max;
+            this.onChange = onChange;
+            this.updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            this.setMessage(Component.literal(this.title + ": " + this.toValue()));
+        }
+
+        @Override
+        protected void applyValue() {
+            this.onChange.accept(this.toValue());
+        }
+
+        private int toValue() {
+            return Mth.clamp((int) Math.round(this.min + (this.max - this.min) * this.value), this.min, this.max);
+        }
+
+        private static double toSlider(int value, int min, int max) {
+            if (max <= min) {
+                return 0.0;
             }
-            configManager.saveConfig();
-            this.onClose();
-        } catch (NumberFormatException e) {
-            // Show error - values will be reset on close
+            return Mth.clamp((value - (double) min) / (double) (max - min), 0.0, 1.0);
         }
     }
     
