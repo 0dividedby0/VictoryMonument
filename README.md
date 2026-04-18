@@ -136,6 +136,91 @@ If using VS Code, use the configured tasks:
 - **MonumentTracker**: Detects wool placement and checks victory conditions
 - **PlayerData**: Tracks collected wool per player
 
+## Structure Spawn Rules
+
+`victorymod.json5` now supports shared default rules plus per-structure overrides.
+
+- Keep using the in-game config screen for global radius/buffer settings.
+- Use JSON5 for advanced structure-specific biome and height rules.
+
+Top-level rule sections:
+
+- `defaultRules`: fallback rules applied to every structure
+- `structures`: overrides for `victory_monument` and each `dungeon_<color>`
+
+Biome rules:
+
+- `mode: "any"` means no biome filtering
+- `mode: "allow"` means the structure may only spawn in listed biomes/tags
+- `mode: "deny"` means the structure may not spawn in listed biomes/tags
+- `values` accepts biome ids like `minecraft:desert` and biome tags like `#minecraft:is_badlands`
+
+Height modes:
+
+- `surface`: place at terrain height plus optional `surfaceOffset`
+- `underground`: choose a Y randomly between `minY` and `maxY`
+- `air`: choose a Y randomly between `minY` and `maxY`
+- `fixed`: always use exact `y`
+
+Example:
+
+```json5
+{
+  "minDungeonRadius": 40,
+  "maxDungeonRadius": 750,
+  "structureBufferDistance": 30,
+
+  "defaultRules": {
+    "biomes": {
+      "mode": "any",
+      "values": []
+    },
+    "height": {
+      "mode": "surface",
+      "minY": 40,
+      "maxY": 120,
+      "y": 64,
+      "surfaceOffset": 0
+    },
+    "placement": {
+      "requireSolidGround": true,
+      "allowWater": false,
+      "allowTrees": false
+    }
+  },
+
+  "structures": {
+    "victory_monument": {},
+
+    "dungeon_yellow": {
+      "biomes": {
+        "mode": "allow",
+        "values": ["minecraft:desert", "#minecraft:is_badlands"]
+      }
+    },
+
+    "dungeon_black": {
+      "height": {
+        "mode": "underground",
+        "minY": 20,
+        "maxY": 45
+      }
+    },
+
+    "dungeon_lightblue": {
+      "height": {
+        "mode": "air",
+        "minY": 120,
+        "maxY": 180
+      },
+      "placement": {
+        "requireSolidGround": false
+      }
+    }
+  }
+}
+```
+
 ### Adding New Features
 
 1. Modify the relevant class files

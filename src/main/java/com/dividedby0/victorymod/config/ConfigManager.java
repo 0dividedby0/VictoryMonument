@@ -1,7 +1,6 @@
 package com.dividedby0.victorymod.config;
 
-import net.minecraft.client.Minecraft;
-import java.nio.file.Paths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 /**
  * Manages the global config instance for the mod
@@ -15,15 +14,14 @@ public class ConfigManager {
     public static JSON5ConfigManager getInstance() {
         if (instance == null) {
             try {
-                Minecraft mc = Minecraft.getInstance();
-                java.nio.file.Path configPath = Paths.get(mc.gameDirectory.toString(), "config");
+                java.nio.file.Path configPath = FMLPaths.CONFIGDIR.get();
                 instance = new JSON5ConfigManager(configPath);
             } catch (Exception e) {
                 System.err.println("Failed to initialize config manager: " + e.getMessage());
                 e.printStackTrace();
                 // Create a fallback with system temp directory
                 try {
-                    instance = new JSON5ConfigManager(Paths.get(System.getProperty("java.io.tmpdir")));
+                    instance = new JSON5ConfigManager(java.nio.file.Paths.get(System.getProperty("java.io.tmpdir")));
                 } catch (Exception ex) {
                     System.err.println("Failed to create fallback config manager: " + ex.getMessage());
                 }
