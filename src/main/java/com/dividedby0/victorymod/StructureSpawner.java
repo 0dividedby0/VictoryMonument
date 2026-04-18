@@ -2,7 +2,6 @@ package com.dividedby0.victorymod;
 
 import com.dividedby0.victorymod.config.ConfigManager;
 import com.dividedby0.victorymod.config.JSON5ConfigManager;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.core.BlockPos;
